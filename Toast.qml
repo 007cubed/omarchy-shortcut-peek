@@ -2,6 +2,11 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
+// Qualified on purpose: QtQuick exports a `Color` value type, which wins over
+// the shell's Color singleton when qs.Commons is imported unqualified, leaving
+// every surface on Qt's default white/black. Omarchy's own components reach
+// colors through this alias for the same reason.
+import qs.Commons as Commons
 import qs.Ui
 import "Promoter.js" as Promoter
 
@@ -76,8 +81,8 @@ Item {
         : root.edgeMargin - (root.opened ? 0 : root.slide)
       width: card.borderLeft + root.pad + row.implicitWidth + root.pad + card.borderRight
       height: card.borderTop + root.pad + row.implicitHeight + root.pad + card.borderBottom
-      color: Util.alpha(Color.popups.background, 0.97)
-      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
+      color: Util.alpha(Commons.Color.popups.background, 0.97)
+      borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))
       radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
 
@@ -96,7 +101,7 @@ Item {
           text: "󰌌"
           font.family: Style.font.family
           font.pixelSize: Style.font.displayLarge * 0.75
-          color: Color.accent
+          color: Commons.Color.accent
         }
 
         Row {
@@ -114,16 +119,16 @@ Item {
                 text: "+"
                 font.family: Style.font.family
                 font.pixelSize: Style.font.bodySmall
-                color: Util.alpha(Color.popups.text, 0.5)
+                color: Util.alpha(Commons.Color.popups.text, 0.5)
               }
               Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 width: label.implicitWidth + Style.space(12)
                 height: label.implicitHeight + Style.space(6)
                 radius: Math.min(Style.cornerRadius, Style.space(4))
-                color: Util.alpha(Color.accent, 0.12)
+                color: Util.alpha(Commons.Color.accent, 0.12)
                 border.width: 1
-                border.color: Util.alpha(Color.accent, 0.6)
+                border.color: Util.alpha(Commons.Color.accent, 0.6)
                 Text {
                   id: label
                   anchors.centerIn: parent
@@ -132,7 +137,7 @@ Item {
                   font.family: Style.font.family
                   font.pixelSize: Style.font.body
                   font.bold: true
-                  color: Color.popups.text
+                  color: Commons.Color.popups.text
                 }
               }
             }
@@ -145,7 +150,7 @@ Item {
           text: root.description
           font.family: Style.font.family
           font.pixelSize: Style.font.title
-          color: Color.popups.text
+          color: Commons.Color.popups.text
           elide: Text.ElideRight
           maximumLineCount: 1
           width: Math.min(implicitWidth, Style.space(260))
@@ -158,7 +163,7 @@ Item {
           text: "×" + root.count
           font.family: Style.font.family
           font.pixelSize: Style.font.bodySmall
-          color: Util.alpha(Color.popups.text, 0.5)
+          color: Util.alpha(Commons.Color.popups.text, 0.5)
         }
       }
     }
