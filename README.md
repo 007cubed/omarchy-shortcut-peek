@@ -1,16 +1,16 @@
-# Shortcut Coach
+# Shortcut Peek
 
 Start something from the Omarchy menu, dock or app grid that already has a keybinding,
 and a small toast shows you the shortcut. It reads **your** bindings, so every override
 in `~/.config/hypr/bindings.lua` counts.
 
-![Shortcut Coach toast](preview.png)
+![Shortcut Peek toast](preview.png)
 
 A fork of [Omarchy Key Promoter](https://github.com/ForrestKnight/omarchy-key-promoter)
 by Forrest Knight. The toast and the binding reader are his. The difference is how it
 decides that you skipped the shortcut:
 
-| | Key Promoter | Shortcut Coach |
+| | Key Promoter | Shortcut Peek |
 |---|---|---|
 | Evidence that the shell started it | the menu closed a moment before | the launch itself carries the shell's environment |
 | Menu | yes | yes |
@@ -27,7 +27,7 @@ It also includes three fixes still waiting upstream: the toast margin on Quicksh
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/GuyKawaii/omarchy-shortcut-coach.git --enable --yes
+omarchy plugin add https://github.com/GuyKawaii/omarchy-shortcut-peek.git --enable --yes
 ```
 
 If Forrest Knight's Key Promoter is installed, disable it first so you don't get two toasts:
@@ -41,7 +41,7 @@ omarchy plugin disable fkcodes.key-promoter
 Inline on the plugin's entry in `~/.config/omarchy/shell.json`:
 
 ```json
-{ "id": "guykawaii.shortcut-coach", "duration": 3500, "position": "bottom-right", "window": 3000, "showCount": true }
+{ "id": "guykawaii.shortcut-peek", "duration": 3500, "position": "bottom-right", "window": 3000, "showCount": true }
 ```
 
 - `position`: `top-left`, `top-center`, `top-right`, `bottom-left`, `bottom-center`, `bottom-right`
@@ -74,15 +74,15 @@ keys (`XF86Calculator`, ...) are never suggested.
 
 A stock Omarchy install: `omarchy-menu-keybindings`, `hyprctl`, `jq`, `ps`, `inotifywait`,
 `xdg-terminal-exec`. No sudo, no network, no extra binds. It never edits Hyprland or shell
-configuration. The only file it writes is `~/.local/state/omarchy/shortcut-coach.json`
+configuration. The only file it writes is `~/.local/state/omarchy/shortcut-peek.json`
 (suggestion counts).
 
 ## Debugging
 
 ```bash
-omarchy-shell shortcut-coach state      # is the launch watcher running?
-omarchy-shell shortcut-coach resolved   # binds it can suggest, and what each matches on
-omarchy-shell shortcut-coach show "SUPER + B" "Browser"   # test toast
+omarchy-shell shortcut-peek state      # is the launch watcher running?
+omarchy-shell shortcut-peek resolved   # binds it can suggest, and what each matches on
+omarchy-shell shortcut-peek show "SUPER + B" "Browser"   # test toast
 ```
 
 ## Tests
@@ -94,7 +94,7 @@ node test/promoter.test.js
 ## Remove
 
 ```bash
-omarchy plugin remove guykawaii.shortcut-coach
+omarchy plugin remove guykawaii.shortcut-peek
 ```
 
 ## License

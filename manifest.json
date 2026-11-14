@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "id": "guykawaii.shortcut-coach",
-  "name": "Shortcut Coach",
+  "id": "guykawaii.shortcut-peek",
+  "name": "Shortcut Peek",
   "version": "1.0.0",
   "author": "GuyKawaii",
   "description": "Shows the keyboard shortcut when you start something from the menu, dock or app grid that already has one. Reads your own Hyprland bindings.",

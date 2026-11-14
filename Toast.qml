@@ -72,7 +72,7 @@ Item {
     visible: root.opened || card.opacity > 0.01
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
-    WlrLayershell.namespace: "shortcut-coach"
+    WlrLayershell.namespace: "shortcut-peek"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore

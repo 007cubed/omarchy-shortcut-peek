@@ -4,7 +4,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "Promoter.js" as Promoter
 
-// Shortcut Coach for Omarchy.
+// Shortcut Peek for Omarchy.
 //
 // When you start something from the Omarchy shell (menu, dock, app grid)
 // that already has a keybinding, show the shortcut in a small themed toast.
@@ -34,12 +34,12 @@ Item {
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
 
   readonly property string home: Quickshell.env("HOME")
-  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "guykawaii.shortcut-coach"
+  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "guykawaii.shortcut-peek"
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
-  readonly property string statePath: home + "/.local/state/omarchy/shortcut-coach.json"
+  readonly property string statePath: home + "/.local/state/omarchy/shortcut-peek.json"
 
   // Settings, inline on this plugin's entry in ~/.config/omarchy/shell.json:
-  //   { "id": "guykawaii.shortcut-coach", "duration": 3500, "position": "bottom-right", "window": 3000, "showCount": true }
+  //   { "id": "guykawaii.shortcut-peek", "duration": 3500, "position": "bottom-right", "window": 3000, "showCount": true }
   // position: top-left | top-center | top-right | bottom-left | bottom-center | bottom-right
   property int duration: 3500
   property string position: "bottom-right"
@@ -99,7 +99,7 @@ Item {
     try {
       binds = Promoter.prepare(JSON.parse(raw || "{}"))
     } catch (err) {
-      console.warn("shortcut-coach: could not parse keybinds:", err)
+      console.warn("shortcut-peek: could not parse keybinds:", err)
     }
   }
 
@@ -225,12 +225,12 @@ Item {
     onExited: {
       service.launchWatchOk = false
       if (service.launchWatchRetries++ < 5) launchWatchRetry.restart()
-      else console.warn("shortcut-coach: launch watcher gave up; falling back to the menu timing alone")
+      else console.warn("shortcut-peek: launch watcher gave up; falling back to the menu timing alone")
     }
     stdout: SplitParser {
       onRead: function(line) { service.onLaunch(line) }
     }
-    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("shortcut-coach launch-watch:", text) }
+    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("shortcut-peek launch-watch:", text) }
   }
 
   Timer {
@@ -243,7 +243,7 @@ Item {
     id: bindsProc
     command: ["bash", service.pluginDir + "/bin/keybinds"]
     stdout: StdioCollector { onStreamFinished: service.loadBinds(text) }
-    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("shortcut-coach keybinds:", text) }
+    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("shortcut-peek keybinds:", text) }
   }
 
   FileView {
@@ -273,7 +273,7 @@ Item {
   }
 
   IpcHandler {
-    target: "shortcut-coach"
+    target: "shortcut-peek"
     function ping(): string { return "ok" }
     function reload(): string { bindsProc.running = true; return "ok" }
     function show(combo: string, description: string): string { toast.show(combo, description, 0); return "ok" }
