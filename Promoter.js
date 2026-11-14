@@ -44,9 +44,21 @@ function stripWrappers(tokens) {
     if (head === "uwsm" && t[1] === "app" && t[2] === "--") { t.splice(0, 3); continue }
     if (head === "uwsm-app" || head === "setsid" || head === "exec" || head === "nohup") { t.splice(0, 1); continue }
     if (head === "bash" || head === "sh" || head === "env") { t.splice(0, 1); continue }
+    // gtk-launch takes a desktop id, which is what windows and entries match on.
+    if (head === "gtk-launch" && t.length > 1) { t = [String(t[1]).replace(/\.desktop$/, "")]; break }
     break
   }
   return t
+}
+
+// "pkill hyprpicker || hyprpicker -a" runs hyprpicker: of a command list, the
+// last command is the one the bind exists for.
+function lastCommand(tokens) {
+  var start = 0
+  for (var i = 0; i < tokens.length; i++) {
+    if (tokens[i] === "||" || tokens[i] === "&&" || tokens[i] === ";") start = i + 1
+  }
+  return tokens.slice(start)
 }
 
 function webappSignature(url, cmd) {
@@ -60,7 +72,7 @@ function webappSignature(url, cmd) {
 }
 
 function signatureForCommand(command, defaults) {
-  var tokens = stripWrappers(shellSplit(command))
+  var tokens = stripWrappers(lastCommand(shellSplit(command)))
   if (!tokens.length) return null
   var t0 = basename(tokens[0])
   var d = defaults || {}
@@ -80,7 +92,9 @@ function signatureForCommand(command, defaults) {
   }
   if (t0 === "omarchy-launch-browser") return { kind: "app", value: String(d.browser || "").toLowerCase(), cmd: t0 }
   if (t0 === "omarchy-launch-nautilus" || t0 === "omarchy-launch-nautilus-cwd") return { kind: "app", value: "nautilus", cmd: t0 }
-  if (t0 === "omarchy-launch-terminal") return { kind: "cmd", cmd: t0 }
+  if (t0 === "omarchy-launch-terminal") {
+    return d.terminal ? { kind: "app", value: String(d.terminal).toLowerCase(), cmd: t0 } : { kind: "cmd", cmd: t0 }
+  }
   if (t0.indexOf("omarchy-menu") === 0) return { kind: "menu", cmd: t0 }
   if (t0 === "omarchy-shell") {
     for (var i = 1; i < tokens.length; i++) {
@@ -195,11 +209,11 @@ function matchLayer(binds, namespace) {
   return pick(found)
 }
 
-// Name of a systemd unit uwsm created for `uwsm-app -- gtk-launch ...`, which
-// is how the shell's app list (and nothing else in Omarchy) starts apps.
-// systemd escapes the hyphen: app-Hyprland-gtk\x2dlaunch-0b3dedd1.scope
-function isLauncherScope(unitName) {
-  return /gtk(\\x2d|-)launch/i.test(String(unitName || ""))
+// A line from bin/launch-watch: "shell\t<unit>\t<cmdline>" or "other\t<unit>".
+function parseLaunch(line) {
+  var f = String(line || "").split("\t")
+  if (f[0] !== "shell" && f[0] !== "other") return null
+  return { shell: f[0] === "shell", unit: f[1] || "", cmd: f.slice(2).join("\t") }
 }
 
 // Process scan lines "<etimes> <tag> <args>": young omarchy-* scripts
@@ -215,15 +229,20 @@ function matchProcesses(binds, psOutput, maxAgeSeconds, shellOnly) {
     if (parseInt(m[1], 10) > maxAgeSeconds) continue
     if (shellOnly && m[2] !== "shell") continue
     var tokens = stripWrappers(shellSplit(m[3]))
+    // An omarchy-* script run by an interpreter shows up as "bash /path/omarchy-x".
     for (var t = 0; t < tokens.length && t < 3; t++) {
-      var name = basename(tokens[t])
-      if (name.indexOf("omarchy-") === 0) { young[name] = true; break }
+      var name = basename(tokens[t]).toLowerCase()
+      if (name.indexOf("omarchy-") === 0) { young[name] = "cmd"; break }
+      if (t === 0) young[name] = young[name] || "proc"
     }
   }
   var found = []
   for (var b = 0; b < binds.length; b++) {
     var s = binds[b].sig
-    if (s && s.kind === "cmd" && young[s.cmd]) found.push({ score: 1, bind: binds[b] })
+    if (!s) continue
+    if (s.kind === "cmd" && young[s.cmd] === "cmd") found.push({ score: 2, bind: binds[b] })
+    // Tools without a window of their own (hyprpicker): the process is all there is.
+    else if (s.kind === "app" && s.value && young[s.value]) found.push({ score: 1, bind: binds[b] })
   }
   return pick(found)
 }

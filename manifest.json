@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "fkcodes.key-promoter",
-  "name": "Omarchy Key Promoter",
-  "version": "0.1.0",
-  "author": "Forrest Knight",
-  "description": "Shows the keyboard shortcut whenever you reach for the menu instead. Reads your own Hyprland bindings.",
+  "id": "guykawaii.shortcut-coach",
+  "name": "Shortcut Coach",
+  "version": "1.0.0",
+  "author": "GuyKawaii",
+  "description": "Shows the keyboard shortcut when you start something from the menu, dock or app grid that already has one. Reads your own Hyprland bindings.",
   "kinds": ["service"],
   "entryPoints": { "service": "Service.qml" }
 }

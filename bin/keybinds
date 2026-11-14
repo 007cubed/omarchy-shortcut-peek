@@ -7,7 +7,7 @@
 #
 # {
 #   "binds": [{ "combo": "SUPER + B", "description": "Browser", "dispatcher": "exec", "arg": "uwsm-app -- chromium" }],
-#   "defaults": { "browser": "chromium", "editor": "nvim" }
+#   "defaults": { "browser": "chromium", "editor": "nvim", "terminal": "foot" }
 # }
 
 set -o pipefail
@@ -39,12 +39,19 @@ default_browser() {
   printf '%s' "${id%.desktop}"
 }
 
+# The terminal xdg-terminal-exec opens, which is what omarchy-launch-terminal runs.
+default_terminal() {
+  local id
+  id=$(xdg-terminal-exec --print-id 2>/dev/null | head -n1)
+  printf '%s' "${id%.desktop}"
+}
+
 default_editor() {
   local file="$HOME/.local/state/omarchy/defaults/editor"
   if [[ -f $file ]]; then head -n1 "$file"; else printf 'nvim'; fi
 }
 
-records | jq -Rn --arg browser "$(default_browser)" --arg editor "$(default_editor)" '
+records | jq -Rn --arg browser "$(default_browser)" --arg editor "$(default_editor)" --arg terminal "$(default_terminal)" '
   {
     binds: [
       inputs
@@ -58,5 +65,5 @@ records | jq -Rn --arg browser "$(default_browser)" --arg editor "$(default_edit
           arg: ($f[2:] | join("\t"))
         }
     ],
-    defaults: { browser: $browser, editor: $editor }
+    defaults: { browser: $browser, editor: $editor, terminal: $terminal }
   }'

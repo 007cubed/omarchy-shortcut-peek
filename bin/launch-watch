@@ -1,0 +1,49 @@
+#!/bin/bash
+# Report every app scope that appears under the uwsm app slice, and who
+# started it. One line per scope:
+#
+#   shell<TAB><unit><TAB><command line>   started by the Omarchy shell
+#   other<TAB><unit>                      started by anything else (a keybinding, a terminal)
+#
+# Everything uwsm launches gets its own scope, and the scope's first process
+# is the launcher itself, so its environment tells the origin: the shell marks
+# its own with QS_* variables (see omarchy-launch-shell) that Hyprland's
+# environment never has. This covers the menu, the dock and the app grid alike.
+#
+# Usage: launch-watch <app-slice-dir> <marker-variable>
+
+set -u
+
+slice=${1:?app slice directory}
+marker=${2:?marker variable}
+
+[[ -d $slice ]] || { echo "launch-watch: no such slice: $slice" >&2; exit 1; }
+command -v inotifywait >/dev/null || { echo "launch-watch: inotifywait not found" >&2; exit 1; }
+
+# The first process of a scope, waiting briefly: systemd creates the cgroup a
+# moment before it moves the launcher into it.
+first_pid() {
+  local procs="$1/cgroup.procs" pid _
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    read -r pid 2>/dev/null <"$procs" && [[ -n $pid ]] && { printf '%s' "$pid"; return 0; }
+    sleep 0.02
+  done
+  return 1
+}
+
+# The shell may SIGKILL this script, which no trap sees; --pdeathsig makes the
+# kernel take inotifywait down with it instead of leaving it orphaned.
+coproc WATCH { exec setpriv --pdeathsig TERM inotifywait -m -q -e create --format %f "$slice"; }
+trap 'kill "$WATCH_PID" 2>/dev/null' EXIT
+trap 'exit 0' TERM INT HUP
+
+while IFS= read -r unit <&"${WATCH[0]}"; do
+  [[ $unit == *.scope ]] || continue
+  pid=$(first_pid "$slice/$unit") || { printf 'other\t%s\n' "$unit"; continue; }
+  if grep -qsz "^$marker=" "/proc/$pid/environ"; then
+    cmd=$(tr '\0\t\n' '   ' <"/proc/$pid/cmdline" 2>/dev/null)
+    printf 'shell\t%s\t%s\n' "$unit" "${cmd% }"
+  else
+    printf 'other\t%s\n' "$unit"
+  fi
+done

@@ -4,27 +4,24 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "Promoter.js" as Promoter
 
-// Key Promoter for Omarchy.
+// Shortcut Coach for Omarchy.
 //
-// Watches for the moment the Omarchy menu closes and, for a short window
-// afterwards, checks whether what happened next already has a keybinding:
-// a window opened (app or web app), a shell layer opened (emojis, clipboard),
-// or an omarchy-* script started (screenshot, color picker, lock). If so, it
-// shows the shortcut in a small themed toast.
+// When you start something from the Omarchy shell (menu, dock, app grid)
+// that already has a keybinding, show the shortcut in a small themed toast.
 //
-// The menu closing is not enough on its own: dismissing it with Escape and
-// then pressing a shortcut looks the same from Hyprland's side. So a launch
-// also has to show it came from the shell, not from a keybinding:
-//   - windows: the menu's app list is the only thing in Omarchy that starts
-//     apps through `uwsm-app -- gtk-launch`, which systemd registers as a
-//     scope named app-*-gtk\x2dlaunch-*.scope. inotify on the app slice sees
-//     that scope appear before the window does. (Walking from the window back
-//     to a process would not work: a Chromium window belongs to the browser
-//     that was already running, however it was asked for.)
-//   - scripts: a process the shell started inherits the shell's environment,
-//     and omarchy-launch-shell sets QS_* variables Hyprland's never has.
-//   - layers (emojis, clipboard): no trace survives, so these still rely on
-//     the time window alone.
+// The shell, not the window, is the evidence. Everything uwsm launches gets a
+// scope under app-graphical.slice, and a scope's first process carries the
+// environment of whoever started it: the shell marks its own with QS_*
+// variables (omarchy-launch-shell) that Hyprland's environment never has.
+// bin/launch-watch reports each new scope as "shell" or "other", so a launch
+// from a keybinding never triggers a toast, whatever the timing. The next
+// window after a shell launch is matched against your binds.
+//
+// What has no scope of its own still needs the menu as the cue:
+//   - scripts (screenshot, color picker, lock): a young process carrying the
+//     shell marker, found by a short process scan after the menu closes;
+//   - shell layers (emojis, clipboard): no trace survives, so these rely on
+//     the menu having closed just before.
 //
 // Bindings are read from this machine, not from Omarchy's defaults, via
 // bin/keybinds, which reuses the resolver behind SUPER + K.
@@ -37,12 +34,12 @@ Item {
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
 
   readonly property string home: Quickshell.env("HOME")
-  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "fkcodes.key-promoter"
+  readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "guykawaii.shortcut-coach"
   readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "").replace(/\/$/, "")
-  readonly property string statePath: home + "/.local/state/omarchy/key-promoter.json"
+  readonly property string statePath: home + "/.local/state/omarchy/shortcut-coach.json"
 
   // Settings, inline on this plugin's entry in ~/.config/omarchy/shell.json:
-  //   { "id": "fkcodes.key-promoter", "duration": 3500, "position": "bottom-right", "window": 3000, "showCount": true }
+  //   { "id": "guykawaii.shortcut-coach", "duration": 3500, "position": "bottom-right", "window": 3000, "showCount": true }
   // position: top-left | top-center | top-right | bottom-left | bottom-center | bottom-right
   property int duration: 3500
   property string position: "bottom-right"
@@ -55,7 +52,7 @@ Item {
   property double armedAt: 0
   property int psRuns: 0
 
-  // Launch-origin evidence, see the header comment.
+  // Launch origin, see the header comment.
   // Where uwsm puts app scopes: .../user@UID.service/app.slice/app-graphical.slice
   readonly property string appSlice: {
     var m = /\/run\/user\/(\d+)/.exec(Quickshell.env("XDG_RUNTIME_DIR") || "")
@@ -71,7 +68,12 @@ Item {
   }
   property bool launchWatchOk: false
   property int launchWatchRetries: 0
-  property double launcherAt: 0
+  // When the shell last started an app scope; cleared by the first window
+  // after it, by a launch from anywhere else, and by a toast.
+  property double shellLaunchAt: 0
+  // Slow apps (Electron, Steam) take a while to map their first window. The
+  // origin is already proven, so this only bounds how long to wait for it.
+  readonly property int launchWindow: 10000
 
   function applySettings(raw) {
     try {
@@ -97,7 +99,7 @@ Item {
     try {
       binds = Promoter.prepare(JSON.parse(raw || "{}"))
     } catch (err) {
-      console.warn("key-promoter: could not parse keybinds:", err)
+      console.warn("shortcut-coach: could not parse keybinds:", err)
     }
   }
 
@@ -127,20 +129,28 @@ Item {
     psTimer.stop()
   }
 
-  // Did the menu's app list launch something since (just before) it closed?
-  // Without a working watcher this cannot be known, so fall back to timing.
-  function fromLauncher() {
-    return !launchWatchOk || launcherAt >= armedAt - 1000
+  function onLaunch(line) {
+    var launch = Promoter.parseLaunch(line)
+    if (!launch) return
+    shellLaunchAt = launch.shell ? Date.now() : 0
+  }
+
+  // Is this new window the result of something the shell just started?
+  // Without the watcher there is no evidence, so fall back to the menu timing.
+  function windowFromShell() {
+    if (!launchWatchOk) return armed()
+    return shellLaunchAt > 0 && Date.now() - shellLaunchAt <= launchWindow
   }
 
   function promote(bind) {
     disarm()
+    shellLaunchAt = 0
     toast.show(bind.combo, bind.description, bump(bind.combo))
   }
 
   Component.onCompleted: {
     bindsProc.running = true
-    if (appSlice) launchWatch.running = true
+    if (appSlice && shellMarker) launchWatch.running = true
   }
 
   Connections {
@@ -150,14 +160,19 @@ Item {
       var data = String(event.data)
       if (name === "configreloaded") { bindsProc.running = true; return }
       if (name === "closelayer") { if (data === "omarchy-menu") service.arm(); return }
-      if (!service.armed()) return
       if (name === "openwindow") {
+        if (!service.windowFromShell()) return
+        // One window per launch: whatever opens next is not the shell's doing.
+        service.shellLaunchAt = 0
         var parts = event.parse(4)
         var cls = parts.length > 2 ? parts[2] : ""
         var entry = cls ? DesktopEntries.heuristicLookup(cls) : null
         var hit = Promoter.matchWindow(service.binds, cls, entry)
-        if (hit && service.fromLauncher()) service.promote(hit)
-      } else if (name === "openlayer") {
+        if (hit) service.promote(hit)
+        return
+      }
+      if (!service.armed()) return
+      if (name === "openlayer") {
         // The menu reopened (submenu, launcher); wait for what it does next.
         if (data === "omarchy-menu") { service.disarm(); return }
         var layerHit = Promoter.matchLayer(service.binds, data)
@@ -169,10 +184,13 @@ Item {
   // Scripts with no window of their own show up only in the process table.
   Timer {
     id: psTimer
-    interval: 350
+    // Short and frequent: a script that execs into another program loses its
+    // name within moments, so the first looks count most.
+    interval: 150
     repeat: true
+    triggeredOnStart: true
     onTriggered: {
-      if (!service.armed() || service.psRuns >= 3) { psTimer.stop(); return }
+      if (!service.armed() || service.psRuns >= 8) { psTimer.stop(); return }
       service.psRuns++
       psProc.running = true
     }
@@ -202,17 +220,17 @@ Item {
   // Scope directories appearing under the app slice, one name per line.
   Process {
     id: launchWatch
-    command: ["inotifywait", "-m", "-q", "-e", "create", "--format", "%f", service.appSlice]
+    command: ["bash", service.pluginDir + "/bin/launch-watch", service.appSlice, service.shellMarker]
     onStarted: { service.launchWatchOk = true; service.launchWatchRetries = 0 }
     onExited: {
       service.launchWatchOk = false
       if (service.launchWatchRetries++ < 5) launchWatchRetry.restart()
-      else console.warn("key-promoter: launch watcher gave up; falling back to the time window alone")
+      else console.warn("shortcut-coach: launch watcher gave up; falling back to the menu timing alone")
     }
     stdout: SplitParser {
-      onRead: function(line) { if (Promoter.isLauncherScope(line)) service.launcherAt = Date.now() }
+      onRead: function(line) { service.onLaunch(line) }
     }
-    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("key-promoter inotifywait:", text) }
+    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("shortcut-coach launch-watch:", text) }
   }
 
   Timer {
@@ -225,7 +243,7 @@ Item {
     id: bindsProc
     command: ["bash", service.pluginDir + "/bin/keybinds"]
     stdout: StdioCollector { onStreamFinished: service.loadBinds(text) }
-    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("key-promoter keybinds:", text) }
+    stderr: StdioCollector { onStreamFinished: if (text.length) console.warn("shortcut-coach keybinds:", text) }
   }
 
   FileView {
@@ -255,7 +273,7 @@ Item {
   }
 
   IpcHandler {
-    target: "key-promoter"
+    target: "shortcut-coach"
     function ping(): string { return "ok" }
     function reload(): string { bindsProc.running = true; return "ok" }
     function show(combo: string, description: string): string { toast.show(combo, description, 0); return "ok" }
@@ -267,7 +285,7 @@ Item {
         launchWatch: service.launchWatchOk,
         appSlice: service.appSlice,
         shellMarker: service.shellMarker,
-        msSinceLauncher: service.launcherAt ? Date.now() - service.launcherAt : null
+        msSinceShellLaunch: service.shellLaunchAt ? Date.now() - service.shellLaunchAt : null
       })
     }
     function resolved(): string {
