@@ -4,7 +4,7 @@
   "name": "Shortcut Peek",
   "version": "1.0.0",
   "author": "GuyKawaii",
-  "description": "Shows the keyboard shortcut when you start something from the menu, dock or app grid that already has one. Reads your own Hyprland bindings.",
+  "description": "Pops up the keyboard shortcut when you launch something with the mouse that already has one.",
   "kinds": ["service"],
   "entryPoints": { "service": "Service.qml" }
 }
