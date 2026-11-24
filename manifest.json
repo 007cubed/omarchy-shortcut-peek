@@ -3,7 +3,7 @@
   "id": "guykawaii.shortcut-peek",
   "name": "Shortcut Peek",
   "version": "1.0.0",
-  "author": "GuyKawaii",
+  "author": "007cubed",
   "description": "Pops up the keyboard shortcut when you launch something with the mouse that already has one.",
   "kinds": ["service"],
   "entryPoints": { "service": "Service.qml" }

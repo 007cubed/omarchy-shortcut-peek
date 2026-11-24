@@ -27,7 +27,7 @@ It also includes three fixes still waiting upstream: the toast margin on Quicksh
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/GuyKawaii/omarchy-shortcut-peek.git --enable --yes
+omarchy plugin add https://github.com/007cubed/omarchy-shortcut-peek.git --enable --yes
 ```
 
 If Forrest Knight's Key Promoter is installed, disable it first so you don't get two toasts:
